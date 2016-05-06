@@ -1,0 +1,7 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.4)
+PROJECT(LEVELDB_DUMP)
+#FIND_PACKAGE(leveldb REQUIRED)
+LINK_DIRECTORIES(/Users/fenqi/Code/leveldb/out-static)
+INCLUDE_DIRECTORIES(/Users/fenqi/Code/leveldb/include)
+ADD_EXECUTABLE(leveldb_dump leveldb_dump.cpp)
+TARGET_LINK_LIBRARIES(leveldb_dump leveldb)
