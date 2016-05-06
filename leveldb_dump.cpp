@@ -1,7 +1,10 @@
 #include <iostream>
+#include <fstream>
+
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
+
 #include <leveldb/db.h>
 #include <leveldb/options.h>
 #include <leveldb/comparator.h>
@@ -74,6 +77,11 @@ void sign_handler(int sig)
 int do_key_dump(const char* db_path, const char* dump_file)
 {
   int dump_fd = -1;
+  ofstream dump_os(dump_file, ofstream::binary);
+  if (!dump_os.is_open()) {
+    fprintf(stderr, "dump file open fail: %s\n", dump_file);
+    return 1;
+  } 
 
   // open db
   leveldb::Options open_options;
@@ -91,22 +99,26 @@ int do_key_dump(const char* db_path, const char* dump_file)
   scan_options.fill_cache = false;
   leveldb::Iterator* db_it = db->NewIterator(scan_options);
 
+  uint32_t cnt = 0;
   for (db_it->SeekToFirst(); !g_stop && db_it->Valid(); db_it->Next())
   {
     string key(const_cast<char*>(db_it->key().data()) + 2, db_it->key().size() - 2);
-    cout << key << endl;
+    dump_os << key << endl;
+    cnt++;
   }
 
-  if (dump_fd > 0)
+  if (dump_os.is_open())
   {
-    close(dump_fd);
+    dump_os.close();
   }
 
-  if (db_it != NULL)
+  cout << "dump ok, " << cnt << " keys.." << endl;
+
+  if (NULL != db_it)
   {
     delete db_it;
   }
-  if (db != NULL)
+  if (NULL != db)
   {
     delete db;
     delete open_options.comparator;
@@ -118,11 +130,11 @@ int do_key_dump(const char* db_path, const char* dump_file)
 
 }
 
-leveldb::Status open_db_readonly(const char* db_path,
-                                 leveldb::Options& options, leveldb::DB*& db)
+leveldb::Status open_db_readonly(const char* db_path, leveldb::Options& options, leveldb::DB*& db)
 {
   options.error_if_exists = false; // exist is ok
   options.create_if_missing = false;
+  options.env = leveldb::Env::Instance();
 
   char buf[32];
   snprintf(buf, sizeof(buf), "/dev/null");
