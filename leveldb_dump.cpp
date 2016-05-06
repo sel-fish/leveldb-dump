@@ -11,15 +11,13 @@ bool g_stop = false;
 
 void print_help(const char* name);
 void sign_handler(int sig);
-int do_key_dump(const char* db_path, const char* manifest, const char* dump_file);
-leveldb::Status open_db_readonly(const char* db_path, const char* manifest,
-                                 leveldb::Options& options, leveldb::DB*& db);
+int do_key_dump(const char* db_path, const char* dump_file);
+leveldb::Status open_db_readonly(const char* db_path, leveldb::Options& options, leveldb::DB*& db);
 
 using namespace std;
 
 int main(int argc, char** argv)
 {
-  char* manifest_file = NULL;
   char* db_path = NULL;
   char* dump_file = NULL;
 	int i = 0;
@@ -31,9 +29,6 @@ int main(int argc, char** argv)
     case 'p':
       db_path = optarg;
       break;
-    case 'f':
-      manifest_file = optarg;
-      break;
     case 'd':
       dump_file = optarg;
       break;
@@ -43,7 +38,7 @@ int main(int argc, char** argv)
     }
   }
 
-  if (db_path == NULL || manifest_file == NULL || dump_file == NULL)
+  if (db_path == NULL || dump_file == NULL)
   {
     print_help(argv[0]);
     return 1;
@@ -52,13 +47,13 @@ int main(int argc, char** argv)
   signal(SIGINT, sign_handler);
   signal(SIGTERM, sign_handler);
 
-	return do_key_dump(db_path, manifest_file, dump_file);
+	return do_key_dump(db_path, dump_file);
 }
 
 void print_help(const char* name)
 {
   fprintf(stderr, "dump ldb data to file\n"
-          "%s -p db_path -f manifestfile -d dump_file",
+          "%s -p db_path -d dump_file",
           name);
 }
 
@@ -76,15 +71,15 @@ void sign_handler(int sig)
   }
 }
 
-int do_key_dump(const char* db_path, const char* manifest, const char* dump_file)
+int do_key_dump(const char* db_path, const char* dump_file)
 {
   int dump_fd = -1;
 
   // open db
   leveldb::Options open_options;
   leveldb::DB* db = NULL;
-  leveldb::Status s = open_db_readonly(db_path, manifest, open_options, db);
-  if (!s.ok())
+  leveldb::Status s = open_db_readonly(db_path, open_options, db);
+  if (!s.ok() || NULL == db)
   {
     fprintf(stderr, "open db fail: %s\n", s.ToString().c_str());
     return 1;
@@ -123,25 +118,23 @@ int do_key_dump(const char* db_path, const char* manifest, const char* dump_file
 
 }
 
-leveldb::Status open_db_readonly(const char* db_path, const char* manifest,
+leveldb::Status open_db_readonly(const char* db_path,
                                  leveldb::Options& options, leveldb::DB*& db)
 {
   options.error_if_exists = false; // exist is ok
   options.create_if_missing = false;
-  // options.table_cache_size = 20 << 20;
-  // options.env = leveldb::Env::Instance();
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "./tmp_ldb_log.%d", getpid());
+  snprintf(buf, sizeof(buf), "/dev/null");
   leveldb::Status s = options.env->NewLogger(buf, &options.info_log);
   if (s.ok())
   {
-    s = leveldb::DB::Open(options, db_path, manifest, &db);
+    s = leveldb::DB::Open(options, db_path, &db);
   }
 
   if (!s.ok())
   {
-    fprintf(stderr, "open db with mainfest fail: %s", s.ToString().c_str());
+    fprintf(stderr, "open db fail: %s", s.ToString().c_str());
     delete options.comparator;
     delete options.env;
     if (options.info_log != NULL)
